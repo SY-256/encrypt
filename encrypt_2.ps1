@@ -1,86 +1,115 @@
 ﻿class Encrypt {
     # propety
     [object] $RSA
-    [object] $PublicKey 
-    [object] $PrivateKey
+    [string] $keys_file
+    [string] $crypto_file
 
     # create Encrypt-Object
-    Encrypt() {
+    Encrypt($filename) {
         # アセンブリロード
         Add-Type -AssemblyName System.Security
         # RSACryptoServiceProviderオブジェクト作成
         $this.RSA = New-Object System.Security.Cryptography.RSACryptoServiceProvider
-        # 公開鍵
-        $this.PublicKey = $this.RSA.ToXmlString($false)
-        # 秘密鍵
-        $this.PrivateKey = $this.RSA.ToXmlString($true)
-    } 
+        # 格納先
+        $file_path = "C:\appl\data\" + $filename
+        # 公開鍵・秘密鍵の出力ファイル
+        $this.keys_file = $file_path + "_keys.txt"
+        # 暗号文
+        $this.crypto_file = $file_path + "_crypto.txt" 
+    }
 
-    
     ##################################################
-    # 公開鍵 暗号化
+    # 公開鍵 秘密鍵
     ##################################################
-    [void] RSAEncrypto($PlainString, $PublicKey, $PrivateKey, $file_name) {
-        # アセンブリロード
-        #Add-Type -AssemblyName System.Security
+    [void] CreateKeys() {
+        # 公開鍵生成
+        $Public_Key = $this.RSA.ToXmlString($false)
+        # 秘密鍵生成
+        $Private_Key = $this.RSA.ToXmlString($true)
+        # 公開鍵・秘密鍵のファイル出力
+        $Public_Key, $Private_Key | Set-Content $this.keys_file -Encoding UTF8
+        # Attribute -> Hidden(隠しファイル),Readonly(読み取り専用)に変更
+        Set-ItemProperty -path $this.keys_file -name Attributes -value "Hidden, Readonly"
+    }
 
-        # RSACryptoServiceProviderオブジェクト作成
-        #$this.RSA = New-Object System.Security.Cryptography.RSACryptoServiceProvider
+    ##################################################
+    # 暗号化
+    ##################################################
+    [void] RSAEncrypt($Array_Plain_Text) {
+        # Keysファイルの読み込み
+        $keys_txt = $this.keys_file
+        $enc = [Text.Encoding]::GetEncoding("UTF-8")
+        $file = New-Object System.IO.StreamReader($keys_txt, $enc)
+        $keys_array = @()
+        while ($null -ne ($line = $file.ReadLine())){
+            $keys_array += $line
+        }
+        $file.Close()
 
-        # バイト配列の生成
-        $ByteData = [System.Text.Encoding]::UTF8.GetBytes($PlainString)
+        # 公開鍵読み込み
+        $Public_Key = $keys_array[0]
 
         # 公開鍵を指定
-        $this.RSA.FromXmlString($PublicKey)
+        $this.RSA.FromXmlString($Public_Key)
+        foreach ($Plain_String in $Array_Plain_Text){
+                
+            # バイト配列生成
+            $Byte_Data = [System.Text.Encoding]::UTF8.GetBytes($Plain_String)
 
-        # 暗号化
-        $EncryptedData = $this.RSA.Encrypt($ByteData, $false)
+            # 暗号化
+            $Encrypted_Data = $this.RSA.Encrypt($Byte_Data, $false)
 
-        # 文字列に変換
-        $EncryptedString = [System.Convert]::ToBase64String($EncryptedData)
-    
-        # オブジェクト削除
-        $this.RSA.Dispose()
+            # 暗号文に変換
+            $Encrypted_String = [System.Convert]::ToBase64String($Encrypted_Data)
 
-        $keys_path = "C:\appl\data\" + $file_name + "_keys.txt"
-        $crypto_path = "C:\appl\data\" + $file_name + "_crypto.text" 
-        $PublicKey, $PrivateKey | Set-Content $keys_path -Encoding UTF8
-        Set-ItemProperty -path $keys_path -name Attributes -value "Readonly"
-
-        $EncryptedString | Set-Content $crypto_path -Encoding UTF8
-        Set-ItemProperty -path $keys_path -name Attributes -value "Hidden, Readonly"
+            # 暗号文のファイル出力
+            $Encrypted_String | Out-File $this.crypto_file -Append -Encoding UTF8
+        }
+        # Attribute -> Readonly(読み取り専用)に変更
+        Set-ItemProperty -path $this.crypto_file -name Attributes -value "Readonly"
     }
 
-    
     ##################################################
-    # 秘密鍵 復号化
+    # 復号化
     ##################################################
-    [string] RSADecrypto($EncryptoString, $PlivateKey){
-        # アセンブリロード
-        #Add-Type -AssemblyName System.Security
+    [array] RSADecrypt(){
+        # Keysファイルの読み込み
+        $keys_txt = $this.keys_file
+        $enc = [Text.Encoding]::GetEncoding("UTF-8")
+        $file = New-Object System.IO.StreamReader($keys_txt, $enc)
+        $keys_array = @()
+        while ($null -ne ($line = $file.ReadLine())){
+            $keys_array += $line
+        }
+        $file.Close()
 
-        # バイト配列にする
-        $this.ByteData = [System.Convert]::FromBase64String($EncryptoString)
-
-        # RSACryptoServiceProviderオブジェクト作成
-        #$this.RSA = New-Object System.Security.Cryptography.RSACryptoServiceProvider
-
+        # 秘密鍵読み込み
+        $Private_Key = $keys_array[1]
         # 秘密鍵を指定
-        $this.RSA.FromXmlString($PlivateKey)
+        $this.RSA.FromXmlString($Private_Key)
 
-        $this.PublicKey | Add-Content "C:\appl\data\test.txt" -Encoding UTF8
-        $this.PrivateKey | Add-Content "C:\appl\data\test.txt" -Encoding UTF8
+        # 暗号ファイルの読み込み
+        $crypto_txt = $this.crypto_file
+        $enc = [Text.Encoding]::GetEncoding("UTF-8")
+        $file = New-Object System.IO.StreamReader($crypto_txt, $enc)
+        $Array_PlainString = @()
+        while ($null -ne ($Encrypt_String = $file.ReadLine())){
+            # バイト配列にする
+            $Byte_Data = [System.Convert]::FromBase64String($Encrypt_String)
 
-        # 復号
-        $this.DecryptedData = $this.RSA.Decrypt($this.ByteData, $false)
+            # 復号
+            $Decrypted_Data = $this.RSA.Decrypt($Byte_Data, $false)
 
-        # 文字列にする
-        $this.PlainString = [System.Text.Encoding]::UTF8.GetString($this.DecryptedData)
+            # 平文にする
+            $Plain_Text = [System.Text.Encoding]::UTF8.GetString($Decrypted_Data)
+
+            $Array_PlainString += $Plain_Text
+        }
+        $file.Close()
 
         # オブジェクト削除
         $this.RSA.Dispose()
-
-        return $this.PlainString
+        # 平文を格納した配列を返す
+        return $Array_PlainString
     }
-
 }

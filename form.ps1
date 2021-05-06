@@ -1,10 +1,13 @@
-﻿# アセンブリの読み込み
+﻿# 暗号化スクリプトのロード
+. "C:\encrypt\encrypt_2.ps1"
+
+# アセンブリの読み込み
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 # フォームの作成
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "テキスト暗号化"
+$form.Text = "暗号化ツール"
 $form.Size = New-Object System.Drawing.Size(340,350)
 
 # OKボタンの設定
@@ -37,7 +40,7 @@ $label2.Text = "暗号化するパスワードを入力してください"
 $label3 = New-Object System.Windows.Forms.Label
 $label3.Location = New-Object System.Drawing.Point(10,150)
 $label3.Size = New-Object System.Drawing.Size(250,30)
-$label3.Text = "出力ファイル名を入力してください`r`n(出力先フォルダ：C:\appl\data)"
+$label3.Text = "出力ファイル名を入力してください`r`n（出力先フォルダ：C:\appl\data）"
 
 
 # 入力ボックスの設定
@@ -68,17 +71,27 @@ $form.Controls.Add($textBox_Pass)
 $form.Controls.Add($textBox_filename)
 
 # フォームを表示させ、その結果を受け取る
+# Cancelなら終了
 $result = $form.ShowDialog()
 if ($result -eq "Cancel")
 {
     exit
 }
-$x = $textBox_ID.Text
-$y = $textBox_Pass.Text
-$z = $textBox_filename.Text
+# フォームの入力を変数へ
+$ID = $textBox_ID.Text
+$PassWord = $textBox_Pass.Text
+$Filename = $textBox_filename.Text
 
-$x
-$y
-$z
+# 暗号化オブジェクト生成
+$Encrypt = New-Object Encrypt($Filename)
 
-pause 
+# 暗号化する平文の配列
+$Array_Plain_Text = @($ID, $PassWord)
+
+# 公開鍵、秘密鍵の生成
+$Encrypt.CreateKeys()
+
+# 暗号化
+$Encrypt.RSAEncrypt($Array_Plain_Text)
+
+$null = [System.Windows.Forms.MessageBox]::Show("暗号化が終了しました。", "暗号化ツール", "OK")

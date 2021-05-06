@@ -26,3 +26,31 @@ function RSAEncrypto($PublicKey, $PlainString){
 
     return $EncryptedString
 }
+
+##################################################
+# 秘密鍵 復号化
+##################################################
+function RSADecrypto($PlivateKey, $EncryptoString){
+    # アセンブリロード
+    Add-Type -AssemblyName System.Security
+
+    # バイト配列にする
+    $ByteData = [System.Convert]::FromBase64String($EncryptoString)
+
+    # RSACryptoServiceProviderオブジェクト作成
+    $RSA = New-Object System.Security.Cryptography.RSACryptoServiceProvider
+
+    # 秘密鍵を指定
+    $RSA.FromXmlString($PlivateKey)
+
+    # 復号
+    $DecryptedData = $RSA.Decrypt($ByteData, $False)
+
+    # 文字列にする
+    $PlainString = [System.Text.Encoding]::UTF8.GetString($DecryptedData)
+
+    # オブジェクト削除
+    $RSA.Dispose()
+
+    return $PlainString
+}
